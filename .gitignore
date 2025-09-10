@@ -3,3 +3,4 @@
 # 로그 제외
 .log
 *.log
+.notionSSH

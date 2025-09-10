@@ -1,32 +1,46 @@
 use anyhow::Result;
-use chrono::{Datelike, Local};
+use chrono::{Datelike, Local, Timelike};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 
 pub use crate::util::node_name;
 
-pub fn write_command_log(user_id: &str, command: &str, req_time_iso: &str) -> Result<()> {
+pub fn write_command_log(email: &str, command: &str) -> Result<()> {
     let logs_dir = Path::new("./logs");
-    write_command_log_with_dir(logs_dir, user_id, command, req_time_iso)
+    write_command_log_with_dir(logs_dir, email, command)
 }
 
-pub fn write_command_log_with_dir(dir: &Path, user_id: &str, command: &str, req_time_iso: &str) -> Result<()> {
+pub fn write_command_log_with_dir(dir: &Path, email: &str, command: &str) -> Result<()> {
     if !dir.exists() {
         fs::create_dir_all(dir)?;
     }
-    let today = Local::now();
+    let now = Local::now();
     let filename = format!(
         "command.{:04}{:02}{:02}.log",
-        today.year(),
-        today.month(),
-        today.day()
+        now.year(),
+        now.month(),
+        now.day()
     );
     let path = dir.join(filename);
     let mut f = OpenOptions::new().create(true).append(true).open(&path)?;
-    let line = format!("[{}] ({}) : {}\n", req_time_iso, user_id, command);
+    let ts = format_bracket_timestamp(now);
+    let line = format!("{} {{{}}} : {}\n", ts, email, command);
     f.write_all(line.as_bytes())?;
     Ok(())
+}
+
+fn format_bracket_timestamp(now: chrono::DateTime<Local>) -> String {
+    let frac5 = now.nanosecond() / 10_000; // 5-digit fractional
+    format!(
+        "[{:04}-{:02}-{:02}:{:02}:{:02}:{:05}]",
+        now.year(),
+        now.month(),
+        now.day(),
+        now.hour(),
+        now.minute(),
+        frac5
+    )
 }
 
 pub fn write_audit_log(command: &str, requester: &str, req_time_iso: &str, node: &str, status: &str) -> Result<()> {
@@ -45,13 +59,19 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
     use std::fs;
+    use regex::Regex;
 
     #[test]
     fn logs_written() {
         let dir = tempdir().unwrap();
-        write_command_log_with_dir(dir.path(), "u1", "echo hi", "2025-01-01T00:00:00Z").unwrap();
+        write_command_log_with_dir(dir.path(), "user@example.com", "DIR").unwrap();
         let entries: Vec<_> = fs::read_dir(dir.path()).unwrap().collect();
         assert_eq!(entries.len(), 1);
+        let p = entries[0].as_ref().unwrap().path();
+        let s = fs::read_to_string(&p).unwrap();
+        // Example: [2025-09-10:16:44:00000] {EMAIL} : DIR
+        let re = Regex::new(r"^\[\d{4}-\d{2}-\d{2}:\d{2}:\d{2}:\d{5}\] \{.*?\} : DIR").unwrap();
+        assert!(re.is_match(s.lines().next().unwrap()));
 
         let audit_path = dir.path().join("audit.log");
         write_audit_log_to(&audit_path, "cmd", "req", "2025-01-01T00:00:00Z", "node1", "success").unwrap();

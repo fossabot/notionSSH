@@ -70,7 +70,7 @@ pub fn run() -> Result<()> {
 
                 let (out, status) = execute_command(&task.command)?;
 
-                write_command_log(&requester_id, &task.command, &task.created_time)?;
+                write_command_log(&requester_email, &task.command)?;
                 write_audit_log(
                     &task.command,
                     &requester_email,
