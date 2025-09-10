@@ -13,8 +13,8 @@ pub fn run() -> Result<()> {
     use executor::execute_command;
     use logger::{node_name, write_audit_log, write_command_log};
     use notion::{
-        append_result_children, build_client, ensure_status_block, fetch_all_children,
-        is_block_processed, lookup_user_email, update_status_block, STATUS_MARKER,
+        append_result_children, build_client, fetch_all_children, is_block_processed,
+        lookup_user_email,
     };
     use parser::parse_command_from_block;
     use util::extract_page_id;
@@ -23,11 +23,7 @@ pub fn run() -> Result<()> {
     let client = build_client(&cfg.api_key)?;
     let page_id = extract_page_id(&cfg.page_url)?;
 
-    // Ensure status block exists and set waiting status
-    let status_id = ensure_status_block(&client, &page_id)?;
-    let waiting_text = "[*] NotionSSH is Loading - waiting for commands. Press Ctrl+C to stop. # notionSSH-status";
-    let _ = update_status_block(&client, &status_id, waiting_text);
-    println!("Started polling Notion for commands. Press Ctrl+C to stop.");
+    println!("[*] NotionSSH is Loading - waiting for commands. Press Ctrl+C to stop.");
 
     loop {
         // Scan for commands
@@ -48,15 +44,7 @@ pub fn run() -> Result<()> {
             }
         }
 
-        if tasks.is_empty() {
-            let _ = update_status_block(&client, &status_id, waiting_text);
-        } else {
-            let count = tasks.len();
-            let _ = update_status_block(
-                &client,
-                &status_id,
-                &format!("[*] NotionSSH is Processing {} command(s)... # {}", count, STATUS_MARKER),
-            );
+        if !tasks.is_empty() {
             for task in tasks {
                 let requester_id = task
                     .created_by_id
@@ -87,7 +75,6 @@ pub fn run() -> Result<()> {
                     &requester_email,
                 )?;
             }
-            let _ = update_status_block(&client, &status_id, waiting_text);
         }
 
         std::thread::sleep(std::time::Duration::from_secs(5));
