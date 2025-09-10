@@ -46,10 +46,6 @@ pub fn run() -> Result<()> {
 
         if !tasks.is_empty() {
             for task in tasks {
-                let requester_id = task
-                    .created_by_id
-                    .clone()
-                    .unwrap_or_else(|| "unknown".to_string());
                 let requester_email = lookup_user_email(
                     &client,
                     task.created_by_id.as_deref().unwrap_or("")
