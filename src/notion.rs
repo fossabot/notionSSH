@@ -1,6 +1,6 @@
 use crate::model::PaginatedBlocks;
 use crate::parser::{children_contains_marker, EXEC_MARKER};
-use crate::util::node_name;
+use crate::util::os_name;
 use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
@@ -78,7 +78,7 @@ pub fn lookup_user_email(client: &Client, user_id: &str) -> Option<String> {
 pub fn build_result_payload(cmd: &str, output: &str, email: &str) -> Value {
     use chrono::{Local, SecondsFormat};
     let now = Local::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let machine = node_name();
+    let machine = os_name();
     let mut body_text = String::new();
     body_text.push_str("$ ");
     body_text.push_str(cmd);

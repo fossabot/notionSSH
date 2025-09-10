@@ -11,13 +11,13 @@ use anyhow::Result;
 pub fn run() -> Result<()> {
     use config::load_config;
     use executor::execute_command;
-    use logger::{node_name, write_audit_log, write_command_log};
+    use logger::{write_audit_log, write_command_log};
     use notion::{
         append_result_children, build_client, fetch_all_children, is_block_processed,
         lookup_user_email,
     };
     use parser::parse_command_from_block;
-    use util::extract_page_id;
+    use util::{extract_page_id, os_name};
 
     let cfg = load_config()?;
     let client = build_client(&cfg.api_key)?;
@@ -63,7 +63,7 @@ pub fn run() -> Result<()> {
                     &task.command,
                     &requester_email,
                     &task.created_time,
-                    &node_name(),
+                    &os_name(),
                     if status { "success" } else { "failed" },
                 )?;
 
@@ -77,6 +77,6 @@ pub fn run() -> Result<()> {
             }
         }
 
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }

@@ -50,6 +50,16 @@ pub fn node_name() -> String {
     name
 }
 
+pub fn os_name() -> String {
+    // Basic OS kind from Rust target identifiers
+    match std::env::consts::OS {
+        "windows" => "Windows".to_string(),
+        "linux" => "Linux".to_string(),
+        "macos" => "macOS".to_string(),
+        other => other.to_string(),
+    }
+}
+
 // Minimal hostname helper without extra crate.
 pub mod hostname {
     use std::ffi::OsString;
