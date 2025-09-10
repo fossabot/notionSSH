@@ -1,1 +1,5 @@
 /target
+
+# 로그 제외
+.log
+*.log
