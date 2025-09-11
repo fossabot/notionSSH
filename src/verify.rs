@@ -23,26 +23,8 @@ pub fn verify_notion_endpoint(enable_ca_pubkey: bool) -> Result<()> {
             Err(_e) => { /* ignore preparation errors to avoid noisy warnings */ }
         }
     }
-    // 1) Resolve via DoH and compare with system resolver. Do not fail hard here;
-    //    record mismatch to prompt user later.
-    let mut doh_ok = true;
-    match doh_ips_union(NOTION_HOST) {
-        Ok(doh_ips) => {
-            if doh_ips.is_empty() { doh_ok = false; }
-            match system_resolve(NOTION_HOST, NOTION_PORT) {
-                Ok(system_ips) => {
-                    if system_ips.is_empty() { doh_ok = false; }
-                    let overlap: HashSet<IpAddr> = system_ips.intersection(&doh_ips).cloned().collect();
-                    if overlap.is_empty() { doh_ok = false; }
-                }
-                Err(_) => { doh_ok = false; }
-            }
-        }
-        Err(_) => { doh_ok = false; }
-    }
-
     // 2) TLS connect with rustls using CA roots (chain verification) and collect peer certs.
-    tls_verify_and_pin(NOTION_HOST, NOTION_PORT, enable_ca_pubkey, doh_ok)
+    tls_verify_and_pin(NOTION_HOST, NOTION_PORT, enable_ca_pubkey)
 }
 
 fn doh_ips_union(host: &str) -> Result<HashSet<IpAddr>> {
@@ -89,7 +71,7 @@ fn system_resolve(host: &str, port: u16) -> Result<HashSet<IpAddr>> {
     Ok(addrs.map(|sa| sa.ip()).collect())
 }
 
-fn tls_verify_and_pin(host: &str, port: u16, enable_ca_pubkey: bool, doh_ok: bool) -> Result<()> {
+fn tls_verify_and_pin(host: &str, port: u16, enable_ca_pubkey: bool) -> Result<()> {
     use rustls::{ClientConfig, ClientConnection, OwnedTrustAnchor, RootCertStore, ServerName, StreamOwned};
     use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -128,32 +110,56 @@ fn tls_verify_and_pin(host: &str, port: u16, enable_ca_pubkey: bool, doh_ok: boo
         "GET /v1/users/me HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
         host
     );
-    tls.write_all(req.as_bytes())?;
+    if let Err(e) = tls.write_all(req.as_bytes()) {
+        eprintln!("[!] 해당 환경에서 CA인증서 인증에 실패했습니다. (1/3)");
+        return Err(e.into());
+    }
     let mut buf = [0u8; 512];
     let _ = tls.read(&mut buf).ok();
+    println!("[*] (1/3) CA certificate chain: PASS");
 
     // Obtain peer certs from the finished connection (chain already verified by rustls).
     let certs = tls.conn.peer_certificates().ok_or_else(|| anyhow!("No peer certificates"))?;
 
-    // Load expected leaf pins from ./verify directory.
-    let expected = load_expected_pins(Path::new("./verify"))?;
+    // Step 2/3: DoH DNS verification
+    let mut doh_ok = true;
+    match doh_ips_union(host) {
+        Ok(doh_ips) => {
+            if doh_ips.is_empty() { doh_ok = false; }
+            match system_resolve(host, port) {
+                Ok(system_ips) => {
+                    if system_ips.is_empty() { doh_ok = false; }
+                    let overlap: HashSet<IpAddr> = system_ips.intersection(&doh_ips).cloned().collect();
+                    if overlap.is_empty() { doh_ok = false; }
+                }
+                Err(_) => { doh_ok = false; }
+            }
+        }
+        Err(_) => { doh_ok = false; }
+    }
+    if doh_ok { println!("[*] (2/3) DoH DNS verification: PASS"); } else {
+        eprintln!("[!] (2/3) DoH DNS verification: FAIL");
+        return Err(anyhow!("DoH verification failed"));
+    }
 
-    // Compute SHA256 of DER for each certificate in the chain and check if any match the expected set.
-    let mut any_match = false;
-    for c in certs {
-        let mut hasher = Sha256::new();
-        hasher.update(&c.0);
-        let digest = hasher.finalize();
-        let hex = hex_upper(&digest);
-        if expected.contains(&hex) {
-            any_match = true;
-            break;
+    // Step 3/3: Certificate pinning (leaf and optional CA pins)
+    let expected_leaf = load_expected_pins(Path::new("./verify"))?;
+    let mut pin_ok = true;
+    let mut pin_status = String::from("SKIP (no pins configured)");
+    if !expected_leaf.is_empty() {
+        let leaf_hex = {
+            let mut h = Sha256::new();
+            h.update(&certs[0].0);
+            hex_upper(&h.finalize())
+        };
+        if expected_leaf.contains(&leaf_hex) {
+            pin_status = String::from("PASS");
+        } else {
+            pin_status = String::from("FAIL (leaf mismatch)");
+            pin_ok = false;
         }
     }
 
-    // If leaf pinning fails, offer CA update prompt after optionally checking CA pins.
-
-    // Optional: CA certificate fingerprint pinning (checks non-leaf certificates in the chain)
     if enable_ca_pubkey {
         let expected_ca = load_expected_ca_pins(Path::new("./verify"))?
             .union(&load_ca_json_pins(Path::new(".notionSSH/ca.json"))?)
@@ -162,38 +168,39 @@ fn tls_verify_and_pin(host: &str, port: u16, enable_ca_pubkey: bool, doh_ok: boo
         if !expected_ca.is_empty() {
             let mut ca_match = false;
             for (idx, c) in certs.iter().enumerate() {
-                if idx == 0 { continue; } // skip leaf
-                // Accept either DER SHA256 or SPKI SHA256 pins
+                if idx == 0 { continue; }
                 let der_hex = {
                     let mut h = Sha256::new();
                     h.update(&c.0);
                     hex_upper(&h.finalize())
                 };
-                if expected_ca.contains(&der_hex) {
-                    ca_match = true; break;
-                }
+                if expected_ca.contains(&der_hex) { ca_match = true; break; }
                 if let Ok(spki_hex) = spki_sha256_hex(&c.0) {
                     if expected_ca.contains(&spki_hex) { ca_match = true; break; }
                 }
             }
             if !ca_match {
-                return Err(anyhow!("CA certificate pin mismatch for {}", host));
+                pin_ok = false;
+                if pin_status == "PASS" { pin_status = String::from("FAIL (CA pin mismatch)"); }
             }
         }
     }
-    if any_match && doh_ok {
-        return Ok(());
+
+    if pin_ok {
+        println!("[*] (3/3) Certificate pinning: {}", pin_status);
+    } else {
+        eprintln!("[!] (3/3) Certificate pinning: {}", pin_status);
+        if pin_status.contains("leaf mismatch") {
+            eprintln!("[!] To refresh pins, run: python scripts/update_notion_verify.py --yes");
+        }
+        if let Err(e) = prompt_and_maybe_update_ca(&tls.conn) {
+            return Err(e);
+        } else {
+            println!("[*] (3/3) Certificate pinning: UPDATED");
+        }
     }
 
-    // DoH mismatch or leaf pin mismatch: ask user whether to update CA.
-    // We also persist newly observed CA public key to .notionSSH/ca.json if user agrees.
-    if !doh_ok {
-        eprintln!("[!] DoH DNS verification did not match system DNS for {}", host);
-    }
-    if !any_match {
-        eprintln!("[!] Leaf certificate pin mismatch for {}", host);
-    }
-    prompt_and_maybe_update_ca(&tls.conn)
+    Ok(())
 }
 
 fn load_expected_pins(dir: &Path) -> Result<HashSet<String>> {
@@ -272,6 +279,13 @@ fn load_ca_json_pins(path: &Path) -> Result<HashSet<String>> {
 // Public helper: check if default saved CA pins exist in .notionSSH/ca.json
 pub fn saved_ca_pins_exist() -> bool {
     load_ca_json_pins(Path::new(".notionSSH/ca.json")).map(|s| !s.is_empty()).unwrap_or(false)
+}
+
+// Public helper: check if any CA pins are configured (verify file or ca.json)
+pub fn ca_pins_configured() -> bool {
+    let from_verify = load_expected_ca_pins(Path::new("./verify")).unwrap_or_default();
+    let from_json = load_ca_json_pins(Path::new(".notionSSH/ca.json")).unwrap_or_default();
+    !(from_verify.is_empty() && from_json.is_empty())
 }
 
 fn write_ca_json_from_verify(verify_dir: &Path, out_json: &Path) -> Result<bool> {

@@ -32,8 +32,13 @@ pub fn run() -> Result<()> {
 
     println!("[*] Verifying Notion API Server...");
     if let Err(e) = verify::verify_notion_endpoint(enable_ca) {
+        if enable_ca {
+            eprintln!("[!] 영어로 인증 실패. 인증서 섹션을 참고하세요.");
+        }
         eprintln!("[!] WARNING: Notion TLS/DoH verification failed: {e}");
         std::process::exit(2);
+    } else if enable_ca && verify::ca_pins_configured() {
+        println!("[*] Certificate verification passed.");
     }
 
     let cfg = load_config()?;
