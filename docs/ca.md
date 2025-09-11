@@ -1,5 +1,11 @@
 # CA 인증서 검증 (Certificate Verification)
 
+## Language / 언어
+- [🇰🇷 한국어](ca.md)
+- [🇺🇸 English](ca_en.md)
+
+---
+
 NotionSSH는 중간자 공격(MITM)을 방지하기 위해 다층 보안 검증을 제공합니다. 이 기능은 Notion API 서버와의 통신 시 인증서 체인 검증, DoH DNS 검증, 인증서 핀(Certificate Pinning)을 통해 보안을 강화합니다.
 
 ## 보안 검증 단계
@@ -63,7 +69,7 @@ verify/
   "host": "api.notion.com",
   "spki_sha256": "CA_PUBLIC_KEY_SPKI_SHA256",
   "der_sha256": "CA_CERTIFICATE_DER_SHA256",
-  "stored_at": "2024-01-15T10:30:45Z"
+  "stored_at": "2025-09-11T10:30:45Z"
 }
 ```
 

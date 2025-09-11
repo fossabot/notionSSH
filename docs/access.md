@@ -1,5 +1,11 @@
 # 사용자 접근 제어 (Access Control)
 
+## Language / 언어
+- [🇰🇷 한국어](access.md)
+- [🇺🇸 English](access_en.md)
+
+---
+
 NotionSSH는 세부적인 사용자 접근 제어를 지원합니다. 특정 사용자가 실행할 수 있는 명령어를 제한하고, 관리자와 일반 사용자를 구분할 수 있습니다.
 
 ## 접근 제어 파일 구조

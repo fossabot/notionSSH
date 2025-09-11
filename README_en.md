@@ -25,7 +25,7 @@ NotionSSH monitors designated Notion pages for command blocks and executes them 
 - **User Tracking**: Logs who executed which commands with timestamps
 - **Audit Logging**: Maintains local command and audit logs for security
 - **Duplicate Prevention**: Prevents re-execution of already processed commands
-- **CA Certificate Verification**: Verifies that the communicating server is genuinely Notion's server - see [ca.md](./docs/ca.md)
+- **CA Certificate Verification**: Verifies that the communicating server is genuinely Notion's server - see [ca_en.md](./docs/ca_en.md)
 
 ## Installation
 
@@ -186,7 +186,7 @@ When a command is executed, NotionSSH automatically appends a code block contain
 $ your-command
 [command output here]
 ---
-executed_by=user@example.com | node=hostname | 2025-01-15T10:30:45Z
+executed_by=user@example.com | node=hostname | 2025-09-11T10:30:45Z
 # notionSSH-executed
 ```
 
@@ -216,7 +216,7 @@ NotionSSH maintains two types of logs:
 - **Command Logging**: All commands are logged with user attribution
 - **No Authentication**: The tool trusts Notion's user management
 - **Shell Access**: Commands run with the same privileges as the NotionSSH process
-- **User Access Control**: Supports fine-grained permission management - see [access.md](./docs/access.md)
+- **User Access Control**: Supports fine-grained permission management - see [access_en.md](./docs/access_en.md)
 
 ## Architecture
 

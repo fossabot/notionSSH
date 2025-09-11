@@ -192,7 +192,7 @@ Notion 페이지에서 다음 문법을 사용하여 명령어를 작성합니�
 $ your-command
 [명령어 출력 결과]
 ---
-executed_by=user@example.com | node=hostname | 2025-01-15T10:30:45Z
+executed_by=user@example.com | node=hostname | 2025-09-11T10:30:45Z
 # notionSSH-executed
 ```
 
