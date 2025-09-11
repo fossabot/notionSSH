@@ -4,7 +4,10 @@ use std::process::Command;
 pub fn execute_command(cmd: &str) -> Result<(String, bool)> {
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("cmd").args(["/C", cmd]).output()?;
+        // Force the shell to use UTF-8 code page so that captured output
+        // decodes correctly for Korean and other Unicode text.
+        let prefixed = format!("chcp 65001>nul & {cmd}");
+        let output = Command::new("cmd").args(["/C", &prefixed]).output()?;
         let mut combined = String::new();
         if !output.stdout.is_empty() {
             combined.push_str(&String::from_utf8_lossy(&output.stdout));

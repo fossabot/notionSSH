@@ -83,6 +83,23 @@ pub mod hostname {
     }
 }
 
+// Ensure Windows console and child input code page use UTF-8 so that
+// Korean and other non-ASCII characters render correctly.
+#[cfg(target_os = "windows")]
+pub fn enable_windows_utf8() {
+    // Best-effort; ignore failures on old systems.
+    unsafe {
+        // 65001 = CP_UTF8
+        use windows_sys::Win32::System::Console::{SetConsoleCP, SetConsoleOutputCP};
+        let _ = SetConsoleOutputCP(65001);
+        let _ = SetConsoleCP(65001);
+    }
+}
+
+// No-op on non-Windows platforms
+#[cfg(not(target_os = "windows"))]
+pub fn enable_windows_utf8() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
