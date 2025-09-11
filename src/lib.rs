@@ -1,4 +1,5 @@
 pub mod config;
+pub mod access;
 pub mod executor;
 pub mod logger;
 pub mod model;
@@ -11,6 +12,7 @@ use anyhow::Result;
 
 pub fn run() -> Result<()> {
     use config::load_config;
+    use access::{is_allowed, load_or_create};
     use executor::execute_command;
     use logger::{write_audit_log, write_command_log};
     use notion::{
@@ -33,7 +35,7 @@ pub fn run() -> Result<()> {
     println!("[*] Verifying Notion API Server...");
     if let Err(e) = verify::verify_notion_endpoint(enable_ca) {
         if enable_ca {
-            eprintln!("[!] 영어로 인증 실패. 인증서 섹션을 참고하세요.");
+            eprintln!("[!] Cannot proceed without CA verification. plaese check the network or CA configuration.");
         }
         eprintln!("[!] WARNING: Notion TLS/DoH verification failed: {e}");
         std::process::exit(2);
@@ -42,6 +44,8 @@ pub fn run() -> Result<()> {
     }
 
     let cfg = load_config()?;
+    // Load or initialize access control file
+    let access_ctrl = load_or_create()?;
     let client = build_client(&cfg.api_key)?;
     let page_id = extract_page_id(&cfg.page_url)?;
 
@@ -74,7 +78,17 @@ pub fn run() -> Result<()> {
                 )
                 .unwrap_or_else(|| "unknown".to_string());
 
-                let (out, status) = execute_command(&task.command)?;
+                // Permission check
+                let (out, status) = if is_allowed(&access_ctrl, &requester_email, &task.command) {
+                    execute_command(&task.command)?
+                } else {
+                    (
+                        "
+                        permission denied to execute the command. Please retry with an authorized account.
+                        ".to_string(),
+                        false,
+                    )
+                };
 
                 write_command_log(&requester_email, &task.command)?;
                 write_audit_log(
