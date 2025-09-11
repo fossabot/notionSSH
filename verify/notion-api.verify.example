@@ -1,0 +1,13 @@
+{
+  "leaf_sha256": [
+    "PUT-LEAF-CERT-SHA256-HEX-HERE"
+  ],
+  "ca_der_sha256": [
+    "PUT-CA-CERT-DER-SHA256-HEX-HERE"
+  ],
+  "ca_spki_sha256": [
+    "PUT-CA-SPKI-SHA256-HEX-HERE"
+  ],
+  "meta":
+    port: "meta-data-here"
+}

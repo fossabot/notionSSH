@@ -5,6 +5,7 @@ pub mod model;
 pub mod notion;
 pub mod parser;
 pub mod util;
+pub mod verify;
 
 use anyhow::Result;
 
@@ -18,6 +19,27 @@ pub fn run() -> Result<()> {
     };
     use parser::parse_command_from_block;
     use util::{extract_page_id, os_name};
+
+    let enable_ca = if verify::saved_ca_pins_exist() {
+        println!("[*] Using saved CA public key verification (.notionSSH/ca.json)");
+        true
+    } else {
+        println!("Use CA public key fingerprint verification? [Y/N]");
+        let mut input = String::new();
+        let _ = std::io::stdin().read_line(&mut input);
+        matches!(input.trim().to_uppercase().as_str(), "Y" | "YES")
+    };
+
+    println!("[*] Verifying Notion API Server...");
+    if let Err(e) = verify::verify_notion_endpoint(enable_ca) {
+        if enable_ca {
+            eprintln!("[!] 영어로 인증 실패. 인증서 섹션을 참고하세요.");
+        }
+        eprintln!("[!] WARNING: Notion TLS/DoH verification failed: {e}");
+        std::process::exit(2);
+    } else if enable_ca && verify::ca_pins_configured() {
+        println!("[*] Certificate verification passed.");
+    }
 
     let cfg = load_config()?;
     let client = build_client(&cfg.api_key)?;
