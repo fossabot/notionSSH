@@ -86,6 +86,7 @@ Notion 통합을 생성하고 설정하려면 다음 단계를 따르세요:
 2. 설정에서 "Integrations" 섹션으로 이동
 
 ![1단계: 통합 페이지](./image/step-1.png)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmirseo%2FnotionSSH.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmirseo%2FnotionSSH?ref=badge_shield)
 
 #### 2단계: 새 통합 생성
 1. "+ New integration" 버튼 클릭
@@ -301,3 +302,7 @@ cargo build --release
 이 프로젝트는 MIT 라이센스를 따릅니다.  
 자유로운 수정, 재배포, 2차 창작을 포함한 라이센스 전역을 허용합니다.
 
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmirseo%2FnotionSSH.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmirseo%2FnotionSSH?ref=badge_large)
